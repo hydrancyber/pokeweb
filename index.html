@@ -19,8 +19,9 @@ button.pri{background:var(--ac);border-color:var(--ac);color:#1a0b06;font-weight
   <div id="load" class="hide" style="text-align:center;padding:20px 0">게임을 불러오는 중…</div>
   <div id="form">
     <div class="tabs"><button id="t-in" class="on">로그인</button><button id="t-up">초대코드로 가입</button></div>
-    <input id="em" type="email" autocomplete="username" placeholder="이메일">
+    <input id="em" autocomplete="username" autocapitalize="none" placeholder="아이디 (또는 이메일)">
     <input id="pw" type="password" autocomplete="current-password" placeholder="비밀번호 (6자 이상)">
+    <input id="pw2" type="password" class="hide" autocomplete="new-password" placeholder="비밀번호 확인 (한 번 더)">
     <input id="iv" class="hide" placeholder="초대코드 (예: ASH-1234ABCD)" autocapitalize="characters">
     <button id="go" class="pri">로그인</button>
     <div id="msg" class="msg"></div>
@@ -32,16 +33,17 @@ button.pri{background:var(--ac);border-color:var(--ac);color:#1a0b06;font-weight
 <script>
 (function(){
 'use strict';
-var $=function(i){return document.getElementById(i)},C=window.PKW_CFG||{},mode='in',busy=false;
+var $=function(i){return document.getElementById(i)},C=window.PKW_CFG||{},mode='in',busy=false,DOM=C.idDomain||'gmail.com';
+function toMail(s){s=String(s||'').trim();return s.indexOf('@')>=0?s:s.toLowerCase()+'@'+DOM}
 function msg(t){$('msg').textContent=t||''}
 function human(e){var m=String((e&&e.message)||e||'');
-  if(m.indexOf('Invalid login')>=0)return'이메일이나 비밀번호가 맞지 않아요.';
+  if(m.indexOf('Invalid login')>=0)return'아이디나 비밀번호가 맞지 않아요.';
   if(m.indexOf('Database error saving')>=0||m.indexOf('invite_')>=0)return'초대코드가 올바르지 않거나, 이미 다 쓴 코드예요.';
-  if(m.indexOf('already registered')>=0)return'이미 가입된 이메일이에요.';
+  if(m.indexOf('already registered')>=0)return'이미 쓰고 있는 아이디예요. 다른 아이디로 해 주세요.';
   if(m.indexOf('at least')>=0||m.indexOf('Password')>=0)return'비밀번호는 6자 이상이어야 해요.';
   if(m.indexOf('Object not found')>=0||m.indexOf('not found')>=0)return'게임 파일이 아직 올라가 있지 않아요. 운영자에게 알려 주세요.';
   return'문제가 생겼어요. 잠시 뒤에 다시 해 주세요.'}
-function setMode(m){mode=m;$('t-in').className=m==='in'?'on':'';$('t-up').className=m==='up'?'on':'';$('iv').className=m==='up'?'':'hide';$('go').textContent=m==='in'?'로그인':'가입하고 들어가기';msg('')}
+function setMode(m){mode=m;$('t-in').className=m==='in'?'on':'';$('t-up').className=m==='up'?'on':'';$('iv').className=m==='up'?'':'hide';$('pw2').className=m==='up'?'':'hide';$('go').textContent=m==='in'?'로그인':'가입하고 들어가기';msg('')}
 $('t-in').onclick=function(){setMode('in')};$('t-up').onclick=function(){setMode('up')};
 if(!C.url||!C.key||!window.supabase){msg('서버 설정(config.js)이 비어 있어요.');$('go').disabled=true;return}
 var sb=window.supabase.createClient(C.url,C.key,{auth:{persistSession:true,autoRefreshToken:true}});
@@ -53,12 +55,13 @@ async function launch(){
   catch(e){$('load').className='hide';$('form').className='';msg(human(e));try{await sb.auth.signOut()}catch(x){}}}
 $('go').onclick=async function(){
   if(busy)return;var em=$('em').value.trim(),pw=$('pw').value,iv=$('iv').value.trim();
-  if(!em||pw.length<6)return msg('이메일과 6자 이상의 비밀번호를 넣어 주세요.');
+  if(!em||pw.length<6)return msg('아이디와 6자 이상의 비밀번호를 넣어 주세요.');
+  if(mode==='up'){if(em.indexOf('@')<0&&!/^[a-z0-9._-]{3,20}$/i.test(em))return msg('아이디는 영문·숫자·._- 3~20자로 적어 주세요.');if($('pw2').value!==pw)return msg('비밀번호 확인이 달라요. 같은 비밀번호를 두 번 입력해 주세요.')}
   if(mode==='up'&&!iv)return msg('초대코드를 넣어 주세요.');
   busy=true;msg('');
-  try{var r=mode==='in'?await sb.auth.signInWithPassword({email:em,password:pw}):await sb.auth.signUp({email:em,password:pw,options:{data:{invite:iv}}});
+  try{var r=mode==='in'?await sb.auth.signInWithPassword({email:toMail(em),password:pw}):await sb.auth.signUp({email:toMail(em),password:pw,options:{data:{invite:iv}}});
     if(r.error)throw r.error;
-    if(!r.data.session){msg('가입됐어요! 이메일 인증이 켜져 있다면 메일 확인 뒤 로그인하세요.');busy=false;return}
+    if(!r.data.session){msg('가입됐어요! 운영자에게 "Confirm email"이 꺼져 있는지 확인해 달라고 하세요.');busy=false;return}
     await launch()}catch(e){msg(human(e))}
   busy=false};
 // 이미 로그인된 브라우저라면 바로 들어간다.
