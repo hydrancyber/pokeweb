@@ -50,8 +50,9 @@ var sb=window.supabase.createClient(C.url,C.key,{auth:{persistSession:true,autoR
 // 로그인에 성공하면 비공개 저장소에서 게임 본체를 받아 이 페이지를 통째로 교체한다.
 async function launch(){
   $('form').className='hide';$('load').className='';
-  try{var r=await sb.storage.from('game').download('game.html');if(r.error)throw r.error;
-    var html=await r.data.text();document.open();document.write(html);document.close()}
+  try{var u=await sb.storage.from('game').createSignedUrl('game.html',120);if(u.error)throw u.error;
+    var resp=await fetch(u.data.signedUrl+'&_='+Date.now(),{cache:'no-store'});if(!resp.ok)throw new Error('not found');
+    var html=await resp.text();document.open();document.write(html);document.close()}
   catch(e){$('load').className='hide';$('form').className='';msg(human(e));try{await sb.auth.signOut()}catch(x){}}}
 $('go').onclick=async function(){
   if(busy)return;var em=$('em').value.trim(),pw=$('pw').value,iv=$('iv').value.trim();
